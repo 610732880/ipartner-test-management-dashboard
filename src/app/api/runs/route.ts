@@ -1,4 +1,4 @@
-import { put } from "@vercel/blob";
+import { get, list, put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { expiryFor, manifestPath, type TestRun } from "@/lib/retention";
 
@@ -18,4 +18,18 @@ export async function POST(request: Request) {
   const pathname = manifestPath(run);
   await put(pathname, JSON.stringify(run, null, 2), { access: "private", contentType: "application/json", addRandomSuffix: false });
   return NextResponse.json({ run, pathname });
+}
+
+export async function GET() {
+  try {
+    const { blobs } = await list({ prefix: "runs/" });
+    const manifests = blobs.filter((blob) => blob.pathname.endsWith("/manifest.json"));
+    const runs = await Promise.all(manifests.map(async (blob) => {
+      const result = await get(blob.url, { access: "private", useCache: false });
+      return result ? JSON.parse(await new Response(result.stream).text()) as TestRun : null;
+    }));
+    return NextResponse.json(runs.filter(Boolean).sort((a, b) => Date.parse(b!.started_at) - Date.parse(a!.started_at)).slice(0, 50));
+  } catch {
+    return NextResponse.json([]);
+  }
 }
