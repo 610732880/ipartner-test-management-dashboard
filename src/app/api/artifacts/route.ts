@@ -13,6 +13,10 @@ export async function POST(request: Request) {
   if (!(file instanceof File) || !runId || !relativePath || relativePath.includes("..")) return NextResponse.json({ error: "Invalid artifact" }, { status: 400 });
   const expiry = expiryFor(status).slice(0, 10);
   const pathname = `runs/${expiry}/${runId}/artifacts/${relativePath.replaceAll("\\", "/")}`;
-  const blob = await put(pathname, file, { access: "private", addRandomSuffix: false, contentType: file.type || "application/octet-stream" });
-  return NextResponse.json({ pathname: blob.pathname });
+  try {
+    const blob = await put(pathname, file, { access: "private", addRandomSuffix: false, contentType: file.type || "application/octet-stream" });
+    return NextResponse.json({ pathname: blob.pathname });
+  } catch (error) {
+    return NextResponse.json({ error: `Blob upload failed: ${(error as Error).message}` }, { status: 502 });
+  }
 }
