@@ -2,6 +2,11 @@ import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { expiryFor } from "@/lib/retention";
 
+function contentTypeFor(pathname: string) {
+  const extension = pathname.split(".").pop()?.toLowerCase();
+  return ({ png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", html: "text/html; charset=utf-8", json: "application/json" } as Record<string, string>)[extension ?? ""] ?? "application/octet-stream";
+}
+
 export async function POST(request: Request) {
   const secret = process.env.TEST_DASHBOARD_UPLOAD_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -14,7 +19,7 @@ export async function POST(request: Request) {
   const expiry = expiryFor(status).slice(0, 10);
   const pathname = `runs/${expiry}/${runId}/artifacts/${relativePath.replaceAll("\\", "/")}`;
   try {
-    const blob = await put(pathname, file, { access: "private", addRandomSuffix: false, contentType: file.type || "application/octet-stream" });
+    const blob = await put(pathname, file, { access: "private", addRandomSuffix: false, contentType: contentTypeFor(relativePath) });
     return NextResponse.json({ pathname: blob.pathname });
   } catch (error) {
     return NextResponse.json({ error: `Blob upload failed: ${(error as Error).message}` }, { status: 502 });
